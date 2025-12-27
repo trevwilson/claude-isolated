@@ -1,0 +1,128 @@
+#!/usr/bin/bash
+# ~/.local/bin/claude-isolated
+# Usage: claude-isolated [-b <branch>] [claude args...]
+#
+# Creates an isolated git worktree for Claude Code to work in.
+# Changes don't affect the main repo until explicitly merged.
+#
+# Options:
+#   -b <branch>  Base worktree on specified branch instead of current branch
+#
+# Inside the session, run ./merge-worktree to merge changes back.
+
+set -e
+
+# Must be in a git repo
+git rev-parse --git-dir > /dev/null 2>&1 || { echo "Not a git repo"; exit 1; }
+
+# Parse optional -b flag
+source_branch=""
+if [[ "$1" == "-b" && -n "$2" ]]; then
+    source_branch="$2"
+    # Verify branch exists
+    if ! git rev-parse --verify "$source_branch" > /dev/null 2>&1; then
+        echo "Error: Branch '$source_branch' does not exist"
+        exit 1
+    fi
+    shift 2
+fi
+
+# Capture current state
+main_repo="$(pwd)"
+source_branch="${source_branch:-$(git branch --show-current)}"
+id="$(date +%s)-$$"
+worktree_branch="claude-session/$id"
+worktree_dir=".worktrees/$id"
+
+# Ensure .worktrees is gitignored
+if ! grep -q "^\.worktrees/$" .gitignore 2>/dev/null; then
+    echo ".worktrees/" >> .gitignore
+    echo "Added .worktrees/ to .gitignore"
+fi
+
+# Create worktree
+git worktree add "$worktree_dir" -b "$worktree_branch" "$source_branch" --quiet
+echo "Created isolated worktree: $worktree_dir"
+echo "Source branch: $source_branch"
+
+# Create merge helper script
+cat > "$worktree_dir/merge-worktree" << 'SCRIPT'
+#!/bin/bash
+set -e
+
+MAIN_REPO="__MAIN_REPO__"
+SOURCE_BRANCH="__SOURCE_BRANCH__"
+WORKTREE_BRANCH="__WORKTREE_BRANCH__"
+
+# Commit any pending changes
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    msg="${1:-Claude session changes}"
+    git add -A
+    git commit -m "$msg"
+    echo "Committed pending changes"
+fi
+
+# Merge source branch INTO worktree (conflicts resolved here)
+echo "Merging $SOURCE_BRANCH into worktree..."
+if ! git merge "$SOURCE_BRANCH" --no-edit; then
+    echo ""
+    echo "=========================================="
+    echo "  CONFLICTS DETECTED"
+    echo "  Resolve them, then run:"
+    echo "  git add -A && git commit && ./merge-worktree"
+    echo "=========================================="
+    exit 1
+fi
+
+# Now fast-forward source branch to include our work
+echo "Fast-forwarding $SOURCE_BRANCH..."
+git -C "$MAIN_REPO" merge "$WORKTREE_BRANCH" --ff-only
+
+echo ""
+echo "Merged into $SOURCE_BRANCH successfully"
+SCRIPT
+
+# Replace placeholders
+sed -i "s|__MAIN_REPO__|$main_repo|g" "$worktree_dir/merge-worktree"
+sed -i "s|__SOURCE_BRANCH__|$source_branch|g" "$worktree_dir/merge-worktree"
+sed -i "s|__WORKTREE_BRANCH__|$worktree_branch|g" "$worktree_dir/merge-worktree"
+chmod +x "$worktree_dir/merge-worktree"
+
+# Launch claude in worktree
+cd "$worktree_dir"
+echo ""
+echo "Run ./merge-worktree to merge changes back to $source_branch"
+echo "Starting Claude..."
+echo ""
+
+claude "$@"
+exit_code=$?
+
+# Post-session prompt
+cd "$main_repo"
+echo ""
+
+# Check if already merged
+if git merge-base --is-ancestor "$worktree_branch" "$source_branch" 2>/dev/null; then
+    echo "Changes already merged to $source_branch"
+else
+    # Check for uncommitted changes
+    if ! git -C "$worktree_dir" diff --quiet 2>/dev/null || \
+       ! git -C "$worktree_dir" diff --cached --quiet 2>/dev/null; then
+        echo "Worktree has uncommitted changes"
+    fi
+
+    read -p "Merge remaining changes to $source_branch? [y/N] " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        (cd "$worktree_dir" && ./merge-worktree)
+    fi
+fi
+
+read -p "Remove worktree and temp branch? [Y/n] " cleanup
+if [[ ! "$cleanup" =~ ^[Nn]$ ]]; then
+    git worktree remove "$worktree_dir" --force 2>/dev/null || true
+    git branch -D "$worktree_branch" 2>/dev/null || true
+    echo "Cleaned up"
+fi
+
+exit $exit_code
