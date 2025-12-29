@@ -1,12 +1,13 @@
 #!/usr/bin/bash
 # ~/.local/bin/claude-isolated
-# Usage: claude-isolated [-b <branch>] [claude args...]
+# Usage: claude-isolated [-b <branch>] [-n <name>] [claude args...]
 #
 # Creates an isolated git worktree for Claude Code to work in.
 # Changes don't affect the main repo until explicitly merged.
 #
 # Options:
 #   -b <branch>  Base worktree on specified branch instead of current branch
+#   -n <name>    Add a custom descriptor to the worktree name
 #
 # Inside the session, run ./merge-worktree to merge changes back.
 
@@ -15,22 +16,44 @@ set -e
 # Must be in a git repo
 git rev-parse --git-dir > /dev/null 2>&1 || { echo "Not a git repo"; exit 1; }
 
-# Parse optional -b flag
+# Parse flags
 source_branch=""
-if [[ "$1" == "-b" && -n "$2" ]]; then
-    source_branch="$2"
-    # Verify branch exists
-    if ! git rev-parse --verify "$source_branch" > /dev/null 2>&1; then
-        echo "Error: Branch '$source_branch' does not exist"
-        exit 1
-    fi
-    shift 2
-fi
+custom_name=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -b)
+            [[ -z "$2" ]] && { echo "Error: -b requires a branch name"; exit 1; }
+            source_branch="$2"
+            if ! git rev-parse --verify "$source_branch" > /dev/null 2>&1; then
+                echo "Error: Branch '$source_branch' does not exist"
+                exit 1
+            fi
+            shift 2
+            ;;
+        -n)
+            [[ -z "$2" ]] && { echo "Error: -n requires a name"; exit 1; }
+            custom_name="$2"
+            shift 2
+            ;;
+        *)
+            break  # Remaining args passed to claude
+            ;;
+    esac
+done
 
 # Capture current state
 main_repo="$(pwd)"
 source_branch="${source_branch:-$(git branch --show-current)}"
-id="$(date +%s)-$$"
+
+# Build readable ID: <branch>[-<custom>]-<YYYYMMDD-HHMM>
+sanitized_branch="${source_branch//\//-}"  # Replace / with -
+sanitized_name="${custom_name//[^a-zA-Z0-9_-]/-}"  # Keep only safe chars
+timestamp="$(date +%Y%m%d-%H%M)"
+if [[ -n "$sanitized_name" ]]; then
+    id="${sanitized_branch}-${sanitized_name}-${timestamp}"
+else
+    id="${sanitized_branch}-${timestamp}"
+fi
 worktree_branch="claude-session/$id"
 worktree_dir=".worktrees/$id"
 

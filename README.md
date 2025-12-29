@@ -18,17 +18,26 @@ claude-isolated
 # Run in worktree based on a specific branch
 claude-isolated -b main
 
+# Add a custom name to identify the session
+claude-isolated -n "refactor-api"
+claude-isolated -b main -n "fix-auth-bug"
+
 # Pass arguments through to claude
 claude-isolated --resume
-claude-isolated -b main --resume
+claude-isolated -b main -n "my-feature" --resume
 ```
 
 ## How It Works
 
-1. Creates a new branch `claude-session/<timestamp>` from your current (or specified) branch
-2. Sets up a worktree in `.worktrees/<timestamp>`
+1. Creates a new branch `claude-session/<branch>[-<name>]-<YYYYMMDD-HHMM>` from your current (or specified) branch
+2. Sets up a worktree in `.worktrees/<branch>[-<name>]-<YYYYMMDD-HHMM>`
 3. Launches Claude Code in that worktree
 4. After the session, prompts to merge changes back and clean up
+
+Example worktree names:
+- `main-20251229-1423` (from main branch)
+- `feature-auth-20251229-1423` (from feature/auth branch)
+- `main-refactor-api-20251229-1423` (with custom name)
 
 Inside the session, you can run `./merge-worktree` to merge changes back to the source branch at any time.
 
