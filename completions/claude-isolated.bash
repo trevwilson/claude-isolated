@@ -23,7 +23,7 @@ _claude_isolated() {
 
     # If current word starts with -, complete flags
     if [[ "$cur" == -* ]]; then
-        COMPREPLY=($(compgen -W "-b -B -n" -- "$cur"))
+        COMPREPLY=($(compgen -W "-b -B -n -l --list -h --help" -- "$cur"))
         return
     fi
 
@@ -35,7 +35,7 @@ _claude_isolated() {
         [[ "$word" == "-n" ]] && has_n=true
     done
 
-    local suggestions=""
+    local suggestions="-l -h"
     $has_branch || suggestions="$suggestions -b -B"
     $has_n || suggestions="$suggestions -n"
 

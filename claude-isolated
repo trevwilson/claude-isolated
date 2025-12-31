@@ -1,27 +1,81 @@
 #!/usr/bin/bash
-# ~/.local/bin/claude-isolated
-# Usage: claude-isolated [-b <branch>] [-B <branch>] [-n <name>] [claude args...]
-#
-# Creates an isolated git worktree for Claude Code to work in.
-# Changes don't affect the main repo until explicitly merged.
-#
-# Options:
-#   -b <branch>  Base worktree on specified branch (must exist)
-#   -B <branch>  Base worktree on specified branch (create from HEAD if doesn't exist)
-#   -n <name>    Add a custom descriptor to the worktree name
-#
-# Inside the session, run ./merge-worktree to merge changes back.
+# claude-isolated - Run Claude Code in an isolated git worktree
 
 set -e
 
+show_help() {
+    cat << 'EOF'
+Usage: claude-isolated [options] [claude args...]
+
+Run Claude Code in an isolated git worktree. Changes don't affect
+your main working directory until explicitly merged.
+
+Options:
+  -b <branch>   Base worktree on specified branch (must exist)
+  -B <branch>   Base worktree on branch (create from HEAD if doesn't exist)
+  -n <name>     Add a custom descriptor to the worktree name
+  -l, --list    List existing worktrees and their status
+  -h, --help    Show this help message
+
+Examples:
+  claude-isolated                    # Use current branch
+  claude-isolated -b main            # Use 'main' branch
+  claude-isolated -B new-feature     # Create 'new-feature' if needed
+  claude-isolated -n "api-work"      # Add descriptor to worktree name
+  claude-isolated --resume           # Pass --resume to Claude
+
+Inside the session, run ./merge-worktree to merge changes back.
+EOF
+    exit 0
+}
+
+list_worktrees() {
+    if [[ ! -d ".worktrees" ]]; then
+        echo "No worktrees found"
+        exit 0
+    fi
+
+    echo "Existing worktrees:"
+    echo ""
+    for dir in .worktrees/*/; do
+        [[ -d "$dir" ]] || continue
+        name=$(basename "$dir")
+        branch="claude-session/$name"
+
+        # Check status
+        status=""
+        if git -C "$dir" diff --quiet 2>/dev/null && git -C "$dir" diff --cached --quiet 2>/dev/null; then
+            # Check if merged
+            source_branch=$(sed -n 's/^SOURCE_BRANCH="\([^"]*\)".*/\1/p' "$dir/merge-worktree" 2>/dev/null)
+            source_branch="${source_branch:-unknown}"
+            if git merge-base --is-ancestor "$branch" "$source_branch" 2>/dev/null; then
+                status="merged"
+            else
+                status="unmerged"
+            fi
+        else
+            status="uncommitted changes"
+        fi
+
+        printf "  %-40s  (%s)\n" "$name" "$status"
+    done
+    exit 0
+}
+
 # Must be in a git repo
-git rev-parse --git-dir > /dev/null 2>&1 || { echo "Not a git repo"; exit 1; }
+git rev-parse --git-dir > /dev/null 2>&1 || { echo "Error: Not a git repo"; exit 1; }
 
 # Parse flags
 source_branch=""
 custom_name=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        -h|--help)
+            show_help
+            ;;
+        -l|--list)
+            list_worktrees
+            ;;
         -b)
             [[ -z "$2" ]] && { echo "Error: -b requires a branch name"; exit 1; }
             source_branch="$2"
@@ -55,6 +109,13 @@ done
 # Capture current state
 main_repo="$(pwd)"
 source_branch="${source_branch:-$(git branch --show-current)}"
+
+# Handle detached HEAD
+if [[ -z "$source_branch" ]]; then
+    echo "Error: Detached HEAD state - no branch checked out"
+    echo "Use -b <branch> or -B <branch> to specify a branch"
+    exit 1
+fi
 
 # Build readable ID: <branch>[-<custom>]-<YYYYMMDD-HHMM>
 sanitized_branch="${source_branch//\//-}"  # Replace / with -

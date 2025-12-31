@@ -1,6 +1,6 @@
 # claude-isolated
 
-Run Claude Code in an isolated git worktree so changes don't affect your main working directory until you explicitly merge them.
+Spin up disposable git worktrees for Claude Code sessions. Each session gets its own temporary branch, so you can run multiple in parallel from the same source branch without conflicts. Changes stay isolated until you explicitly merge them.
 
 ## Installation
 
