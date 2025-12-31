@@ -5,9 +5,16 @@ Run Claude Code in an isolated git worktree so changes don't affect your main wo
 ## Installation
 
 ```bash
-sudo cp claude-isolated /usr/local/bin/
-sudo chmod +x /usr/local/bin/claude-isolated
+# User-local install (recommended)
+./install.sh
+
+# System-wide install
+./install.sh --system
 ```
+
+This installs:
+- `claude-isolated` to `~/.local/bin/` (or `/usr/local/bin/` with `--system`)
+- Bash completions for tab-completing branch names with `-b`
 
 ## Usage
 
