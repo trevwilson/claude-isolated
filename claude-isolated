@@ -44,7 +44,12 @@ list_worktrees() {
     for dir in .worktrees/*/; do
         [[ -d "$dir" ]] || continue
         name=$(basename "$dir")
-        branch="claude-session/$name"
+
+        # Get actual branch from worktree (not derived from directory name)
+        branch=$(git -C "$dir" branch --show-current 2>/dev/null)
+        if [[ -z "$branch" ]]; then
+            branch="(detached HEAD)"
+        fi
 
         # Check status
         status=""
@@ -161,6 +166,17 @@ set -e
 MAIN_REPO="__MAIN_REPO__"
 SOURCE_BRANCH="__SOURCE_BRANCH__"
 WORKTREE_BRANCH="__WORKTREE_BRANCH__"
+
+# Sanity check: verify we're on the expected branch
+actual_branch=$(git branch --show-current)
+if [[ "$actual_branch" != "$WORKTREE_BRANCH" ]]; then
+    echo "Error: Expected branch $WORKTREE_BRANCH"
+    echo "       But currently on $actual_branch"
+    echo ""
+    echo "Did you checkout a different branch in this worktree?"
+    echo "The merge-worktree script is gitignored and won't update on checkout."
+    exit 1
+fi
 
 # Commit any pending changes
 if ! git diff --quiet || ! git diff --cached --quiet; then
