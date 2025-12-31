@@ -14,6 +14,8 @@ Options:
   -b <branch>   Base worktree on specified branch (must exist)
   -B <branch>   Base worktree on branch (create from HEAD if doesn't exist)
   -n <name>     Add a custom descriptor to the worktree name
+  --code        Open VS Code in worktree instead of launching Claude
+  --code-wait   Open VS Code and wait; show merge prompts when closed
   -l, --list    List existing worktrees and their status
   -h, --help    Show this help message
 
@@ -23,6 +25,8 @@ Examples:
   claude-isolated -B new-feature     # Create 'new-feature' if needed
   claude-isolated -n "api-work"      # Add descriptor to worktree name
   claude-isolated --resume           # Pass --resume to Claude
+  claude-isolated --code             # Open VS Code, run claude manually
+  claude-isolated --code-wait        # Open VS Code, merge prompts on close
 
 Inside the session, run ./merge-worktree to merge changes back.
 EOF
@@ -68,6 +72,7 @@ git rev-parse --git-dir > /dev/null 2>&1 || { echo "Error: Not a git repo"; exit
 # Parse flags
 source_branch=""
 custom_name=""
+launch_mode="claude"  # claude, code, code-wait
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
@@ -75,6 +80,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         -l|--list)
             list_worktrees
+            ;;
+        --code)
+            launch_mode="code"
+            shift
+            ;;
+        --code-wait)
+            launch_mode="code-wait"
+            shift
             ;;
         -b)
             [[ -z "$2" ]] && { echo "Error: -b requires a branch name"; exit 1; }
@@ -183,17 +196,34 @@ sed -i "s|__SOURCE_BRANCH__|$source_branch|g" "$worktree_dir/merge-worktree"
 sed -i "s|__WORKTREE_BRANCH__|$worktree_branch|g" "$worktree_dir/merge-worktree"
 chmod +x "$worktree_dir/merge-worktree"
 
-# Launch claude in worktree
-cd "$worktree_dir"
+# Launch based on mode
 echo ""
 echo "Run ./merge-worktree to merge changes back to $source_branch"
-echo "Starting Claude..."
-echo ""
 
-claude "$@"
-exit_code=$?
+case "$launch_mode" in
+    code)
+        echo "Opening VS Code..."
+        code "$worktree_dir"
+        echo ""
+        echo "When done, run ./merge-worktree from the worktree."
+        echo "To clean up: git worktree remove $worktree_dir --force && git branch -D $worktree_branch"
+        exit 0
+        ;;
+    code-wait)
+        echo "Opening VS Code (will prompt for merge when closed)..."
+        code --wait "$worktree_dir"
+        exit_code=$?
+        ;;
+    claude)
+        echo "Starting Claude..."
+        echo ""
+        cd "$worktree_dir"
+        claude "$@"
+        exit_code=$?
+        ;;
+esac
 
-# Post-session prompt
+# Post-session prompt (code-wait and claude modes)
 cd "$main_repo"
 echo ""
 

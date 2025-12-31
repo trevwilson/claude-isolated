@@ -23,7 +23,7 @@ _claude_isolated() {
 
     # If current word starts with -, complete flags
     if [[ "$cur" == -* ]]; then
-        COMPREPLY=($(compgen -W "-b -B -n -l --list -h --help" -- "$cur"))
+        COMPREPLY=($(compgen -W "-b -B -n -l --list -h --help --code --code-wait" -- "$cur"))
         return
     fi
 

@@ -35,6 +35,10 @@ claude-isolated -b main -n "fix-auth-bug"
 # Pass arguments through to claude
 claude-isolated --resume
 claude-isolated -B new-feature -n "initial-impl" --resume
+
+# VS Code integration: open worktree in VS Code instead of launching Claude
+claude-isolated --code                # Opens VS Code, you run claude manually
+claude-isolated --code-wait           # Opens VS Code, merge prompts when closed
 ```
 
 ## How It Works
