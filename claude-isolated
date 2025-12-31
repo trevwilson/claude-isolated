@@ -1,12 +1,13 @@
 #!/usr/bin/bash
 # ~/.local/bin/claude-isolated
-# Usage: claude-isolated [-b <branch>] [-n <name>] [claude args...]
+# Usage: claude-isolated [-b <branch>] [-B <branch>] [-n <name>] [claude args...]
 #
 # Creates an isolated git worktree for Claude Code to work in.
 # Changes don't affect the main repo until explicitly merged.
 #
 # Options:
-#   -b <branch>  Base worktree on specified branch instead of current branch
+#   -b <branch>  Base worktree on specified branch (must exist)
+#   -B <branch>  Base worktree on specified branch (create from HEAD if doesn't exist)
 #   -n <name>    Add a custom descriptor to the worktree name
 #
 # Inside the session, run ./merge-worktree to merge changes back.
@@ -26,7 +27,17 @@ while [[ $# -gt 0 ]]; do
             source_branch="$2"
             if ! git rev-parse --verify "$source_branch" > /dev/null 2>&1; then
                 echo "Error: Branch '$source_branch' does not exist"
+                echo "Use -B to create a new branch"
                 exit 1
+            fi
+            shift 2
+            ;;
+        -B)
+            [[ -z "$2" ]] && { echo "Error: -B requires a branch name"; exit 1; }
+            source_branch="$2"
+            if ! git rev-parse --verify "$source_branch" > /dev/null 2>&1; then
+                echo "Creating branch '$source_branch' from HEAD..."
+                git branch "$source_branch"
             fi
             shift 2
             ;;

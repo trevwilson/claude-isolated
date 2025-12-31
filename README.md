@@ -14,7 +14,7 @@ Run Claude Code in an isolated git worktree so changes don't affect your main wo
 
 This installs:
 - `claude-isolated` to `~/.local/bin/` (or `/usr/local/bin/` with `--system`)
-- Bash completions for tab-completing branch names with `-b`
+- Bash completions for tab-completing branch names with `-b` and `-B`
 
 ## Usage
 
@@ -25,13 +25,16 @@ claude-isolated
 # Run in worktree based on a specific branch
 claude-isolated -b main
 
+# Create a new branch if it doesn't exist (branches from HEAD)
+claude-isolated -B new-feature
+
 # Add a custom name to identify the session
 claude-isolated -n "refactor-api"
 claude-isolated -b main -n "fix-auth-bug"
 
 # Pass arguments through to claude
 claude-isolated --resume
-claude-isolated -b main -n "my-feature" --resume
+claude-isolated -B new-feature -n "initial-impl" --resume
 ```
 
 ## How It Works
