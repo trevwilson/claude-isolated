@@ -158,6 +158,11 @@ git worktree add "$worktree_dir" -b "$worktree_branch" "$source_branch" --quiet
 echo "Created isolated worktree: $worktree_dir"
 echo "Source branch: $source_branch"
 
+# Copy .claude folder for permissions/settings
+if [[ -d "$main_repo/.claude" ]]; then
+    cp -r "$main_repo/.claude" "$worktree_dir/.claude"
+fi
+
 # Create merge helper script
 cat > "$worktree_dir/merge-worktree" << 'SCRIPT'
 #!/bin/bash
