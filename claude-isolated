@@ -203,9 +203,21 @@ if ! git merge "$SOURCE_BRANCH" --no-edit; then
     exit 1
 fi
 
-# Now fast-forward source branch to include our work
+# Verify fast-forward is possible
+if ! git -C "$MAIN_REPO" merge-base --is-ancestor "$SOURCE_BRANCH" "$WORKTREE_BRANCH"; then
+    echo ""
+    echo "=========================================="
+    echo "  CANNOT FAST-FORWARD"
+    echo "  $SOURCE_BRANCH has diverged from this worktree."
+    echo "  Pull latest changes: git merge $SOURCE_BRANCH"
+    echo "  Then run ./merge-worktree again"
+    echo "=========================================="
+    exit 1
+fi
+
+# Fast-forward source branch (works regardless of what's checked out in main repo)
 echo "Fast-forwarding $SOURCE_BRANCH..."
-git -C "$MAIN_REPO" merge "$WORKTREE_BRANCH" --ff-only
+git -C "$MAIN_REPO" branch -f "$SOURCE_BRANCH" "$WORKTREE_BRANCH"
 
 echo ""
 echo "Merged into $SOURCE_BRANCH successfully"
