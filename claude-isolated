@@ -159,7 +159,9 @@ echo "Created isolated worktree: $worktree_dir"
 echo "Source branch: $source_branch"
 
 # Copy .claude folder for permissions/settings
+# Remove first to avoid nesting if worktree already has .claude from git
 if [[ -d "$main_repo/.claude" ]]; then
+    rm -rf "$worktree_dir/.claude"
     cp -r "$main_repo/.claude" "$worktree_dir/.claude"
 fi
 
