@@ -17,6 +17,7 @@ Options:
   --code        Open VS Code in worktree instead of launching Claude
   --code-wait   Open VS Code and wait; show merge prompts when closed
   -l, --list    List existing worktrees and their status
+  --prune       Remove stale worktree entries from ~/.claude.json
   -h, --help    Show this help message
 
 Examples:
@@ -71,6 +72,30 @@ list_worktrees() {
     exit 0
 }
 
+prune_stale_projects() {
+    if [[ ! -f "$HOME/.claude.json" ]]; then
+        echo "No ~/.claude.json found"
+        exit 0
+    fi
+
+    node -e "
+        const fs = require('fs');
+        const f = process.env.HOME + '/.claude.json';
+        const d = JSON.parse(fs.readFileSync(f));
+        let removed = 0;
+        for (const p of Object.keys(d.projects || {})) {
+            if (p.includes('/.worktrees/') && !fs.existsSync(p)) {
+                delete d.projects[p];
+                removed++;
+                console.log('Removed:', p);
+            }
+        }
+        if (removed) fs.writeFileSync(f, JSON.stringify(d, null, 2));
+        console.log('Pruned', removed, 'stale worktree entries');
+    "
+    exit 0
+}
+
 # Must be in a git repo
 git rev-parse --git-dir > /dev/null 2>&1 || { echo "Error: Not a git repo"; exit 1; }
 
@@ -85,6 +110,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         -l|--list)
             list_worktrees
+            ;;
+        --prune)
+            prune_stale_projects
             ;;
         --code)
             launch_mode="code"
@@ -280,8 +308,23 @@ fi
 
 read -p "Remove worktree and temp branch? [Y/n] " cleanup
 if [[ ! "$cleanup" =~ ^[Nn]$ ]]; then
+    # Get absolute path before removing worktree
+    worktree_abs_path=$(realpath "$worktree_dir" 2>/dev/null || echo "")
+
     git worktree remove "$worktree_dir" --force 2>/dev/null || true
     git branch -D "$worktree_branch" 2>/dev/null || true
+
+    # Remove worktree project from Claude's config to avoid polluting ~/.claude.json
+    if [[ -n "$worktree_abs_path" && -f "$HOME/.claude.json" ]]; then
+        node -e "
+            const fs = require('fs');
+            const f = process.env.HOME + '/.claude.json';
+            const d = JSON.parse(fs.readFileSync(f));
+            delete d.projects['$worktree_abs_path'];
+            fs.writeFileSync(f, JSON.stringify(d, null, 2));
+        " 2>/dev/null || true
+    fi
+
     echo "Cleaned up"
 fi
 
