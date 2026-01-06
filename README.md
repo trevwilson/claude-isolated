@@ -10,11 +10,23 @@ Spin up disposable git worktrees for Claude Code sessions. Each session gets its
 
 # System-wide install
 ./install.sh --system
+
+# Also install the /merge-worktree slash command for Claude
+./install.sh --with-commands
 ```
 
 This installs:
 - `claude-isolated` to `~/.local/bin/` (or `/usr/local/bin/` with `--system`)
 - Bash completions for tab-completing branch names with `-b` and `-B`
+- Optional: `/merge-worktree` slash command to `~/.claude/commands/`
+
+## Uninstall
+
+```bash
+./uninstall.sh
+```
+
+Removes everything from both user-local and system-wide locations.
 
 ## Usage
 
@@ -59,7 +71,7 @@ Example worktree names:
 - `feature-auth-20251229-1423` (from feature/auth branch)
 - `main-refactor-api-20251229-1423` (with custom name)
 
-Inside the session, you can run `./merge-worktree` to merge changes back to the source branch at any time.
+Inside the session, you can run `./merge-worktree` to merge changes back to the source branch at any time. If you installed with `--with-commands`, you can also use the `/merge-worktree` slash command in Claude.
 
 ## Why Use This?
 

@@ -8,9 +8,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Default install locations (user-local)
 BIN_DIR="${HOME}/.local/bin"
 COMPLETION_DIR="${HOME}/.local/share/bash-completion/completions"
+CLAUDE_COMMANDS_DIR="${HOME}/.claude/commands"
 
 # Parse flags
 USE_SYSTEM=false
+WITH_COMMANDS=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --system)
@@ -19,14 +21,19 @@ while [[ $# -gt 0 ]]; do
             COMPLETION_DIR="/etc/bash_completion.d"
             shift
             ;;
+        --with-commands)
+            WITH_COMMANDS=true
+            shift
+            ;;
         -h|--help)
-            echo "Usage: install.sh [--system]"
+            echo "Usage: install.sh [--system] [--with-commands]"
             echo ""
             echo "Installs claude-isolated and bash completions."
             echo ""
             echo "Options:"
-            echo "  --system    Install system-wide (requires sudo)"
-            echo "              Default: installs to ~/.local/bin"
+            echo "  --system         Install system-wide (requires sudo)"
+            echo "                   Default: installs to ~/.local/bin"
+            echo "  --with-commands  Also install Claude slash commands to ~/.claude/commands/"
             exit 0
             ;;
         *)
@@ -57,6 +64,13 @@ else
     cp "$SCRIPT_DIR/completions/claude-isolated.bash" "$COMPLETION_DIR/claude-isolated"
 fi
 echo "Installed completions to $COMPLETION_DIR/claude-isolated"
+
+# Install Claude slash commands if requested
+if $WITH_COMMANDS; then
+    mkdir -p "$CLAUDE_COMMANDS_DIR"
+    cp "$SCRIPT_DIR/commands/"*.md "$CLAUDE_COMMANDS_DIR/"
+    echo "Installed Claude slash commands to $CLAUDE_COMMANDS_DIR/"
+fi
 
 # Check if BIN_DIR is in PATH
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
